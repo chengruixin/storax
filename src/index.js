@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
 
-console.info('Respondx react version', React.version);
-
 function proxify(obj, handler) {
   const plainObj = {};
   const referenceObj = {};
