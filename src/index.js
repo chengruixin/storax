@@ -101,14 +101,6 @@ function createContext(dataSource) {
 
 export function createStore(dataSource, reducer) {
   const context = createContext(dataSource);
-  function useConnector(selector) {
-    const [, forceUpdate] = useState({});
-    const { value, disConnect } = connect(context, selector, () => {
-      forceUpdate({});
-    });
-    useEffect(() => disConnect, []);
-    return value;
-  }
 
   function dispatch({ action, payload }) {
     const reducerAction = reducer({ action, payload });
@@ -116,10 +108,17 @@ export function createStore(dataSource, reducer) {
   }
 
   return {
-    useConnector,
+    context,
     dispatch
   }
-  
+}
+
+export function useConnector(context, selector, callback) {
+  // console.log(1);
+  // const [, forceUpdate] = useState({});
+  const { value, disConnect } = connect(context, selector, callback);
+  // useEffect(() => disConnect, []);
+  return [value, disConnect];
 }
 
 export function combineAllReducers(...reducers) {
