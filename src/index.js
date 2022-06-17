@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+
+console.info('Respondx react version', React.version);
 
 function proxify(obj, handler) {
   const plainObj = {};
@@ -102,23 +104,24 @@ function createContext(dataSource) {
 export function createStore(dataSource, reducer) {
   const context = createContext(dataSource);
 
-  function dispatch({ action, payload }) {
-    const reducerAction = reducer({ action, payload });
+  function dispatch(request) {
+    const reducerAction = typeof request !== 'function' ? reducer(request) : request;
     reducerAction(context.proxiedObj);
   }
 
+  function useConnector(selector) {
+    const [, forceUpdate] = useState({});
+    const { value, disConnect } = connect(context, selector, () => {
+      forceUpdate({});
+    });
+    useEffect(() => disConnect, []);
+    return value;
+  }
+
   return {
-    context,
+    useConnector,
     dispatch
   }
-}
-
-export function useConnector(context, selector, callback) {
-  // console.log(1);
-  // const [, forceUpdate] = useState({});
-  const { value, disConnect } = connect(context, selector, callback);
-  // useEffect(() => disConnect, []);
-  return [value, disConnect];
 }
 
 export function combineAllReducers(...reducers) {
