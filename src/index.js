@@ -1,5 +1,3 @@
-import React, { useEffect, useState } from 'react';
-
 function proxify(obj, handler) {
   const plainObj = {};
   const referenceObj = {};
@@ -26,7 +24,7 @@ function proxify(obj, handler) {
 }
 
 const createHandler = (context) => {
-  const res = {
+  const handler = {
     get(target, property) {
       context.lastTarget = target;
       context.lastProperty = property;
@@ -43,7 +41,7 @@ const createHandler = (context) => {
       } 
   
       if (typeof target[property] === 'object') {
-        const proxied = proxify(val, res);
+        const proxied = proxify(val, handler);
         return Reflect.set(target, property, proxied);
       }
 
@@ -51,10 +49,10 @@ const createHandler = (context) => {
     }
   }
 
-  return res;
+  return handler;
 }
 
-function connect(context, selector, callback) {
+export function connect(context, selector, callback) {
   const value = selector(context.proxiedObj);
   const {
     varReference,
@@ -83,7 +81,7 @@ function connect(context, selector, callback) {
   };
 }
 
-function createContext(dataSource) {
+export function createContext(dataSource) {
   const context = {
     lastTarget: null,
     lastProperty: null,
@@ -97,29 +95,6 @@ function createContext(dataSource) {
   context.proxiedObj = proxiedObj;
 
   return context;
-}
-
-export function createStore(dataSource, reducer) {
-  const context = createContext(dataSource);
-
-  function dispatch(request) {
-    const reducerAction = typeof request !== 'function' ? reducer(request) : request;
-    reducerAction(context.proxiedObj);
-  }
-
-  function useConnector(selector) {
-    const [, forceUpdate] = useState({});
-    const { value, disConnect } = connect(context, selector, () => {
-      forceUpdate({});
-    });
-    useEffect(() => disConnect, []);
-    return value;
-  }
-
-  return {
-    useConnector,
-    dispatch
-  }
 }
 
 export function combineAllReducers(...reducers) {
