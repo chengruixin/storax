@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { createContext, connect } from './index';
 
 export function createStore(dataSource, reducer) {
@@ -23,5 +23,17 @@ export function createStore(dataSource, reducer) {
     useConnector,
     dispatch,
   };
+}
+
+export function combineAllReducers(...reducers) {
+  return chunkData => {
+    for (let i = 0; i < reducers.length; i++) {
+      const reducerAction = reducers[i](chunkData)
+      if (reducerAction) {
+        return reducerAction;
+      }
+    }
+    return null;
+  }
 }
 

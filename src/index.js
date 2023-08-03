@@ -1,9 +1,43 @@
+const clearAndRunAllDeps = (dependencyBucket, target, property) => {
+  if (
+    dependencyBucket.has(target) &&
+    dependencyBucket.get(target).has(property)
+  ) {
+    const callbackArr = dependencyBucket.get(target).get(property);
+
+    // release all dependenies and execute
+    while (callbackArr.length) {
+      callbackArr.shift()();
+    }
+  }
+};
+
+const addDep = (dependencyBucket, target, property, dep) => {
+  // prepare for non target
+  if (!dependencyBucket.has(target)) {
+    dependencyBucket.set(target, new Map());
+  }
+
+  // prepare for non property on target
+  if (!dependencyBucket.get(target).has(property)) {
+    dependencyBucket.get(target).set(property, []);
+  }
+
+  // real add dep operation
+  dependencyBucket
+    .get(target)
+    .get(property)
+    .push(() => {
+      dep();
+    });
+};
+
 function proxify(obj, handler) {
   const plainObj = {};
   const referenceObj = {};
 
   for (const key of Object.keys(obj)) {
-    if (typeof obj[key] !== 'object') {
+    if (typeof obj[key] !== "object") {
       plainObj[key] = obj[key];
     } else {
       referenceObj[key] = obj[key];
@@ -15,10 +49,13 @@ function proxify(obj, handler) {
     referenceObj[key] = proxify(referenceObj[key], handler);
   }
 
-  const res = new Proxy({
-    ...plainProxied,
-    ...referenceObj
-  }, handler);
+  const res = new Proxy(
+    {
+      ...plainProxied,
+      ...referenceObj,
+    },
+    handler
+  );
 
   return res;
 }
@@ -26,67 +63,59 @@ function proxify(obj, handler) {
 const createHandler = (context) => {
   const handler = {
     get(target, property) {
-      context.lastTarget = target;
-      context.lastProperty = property;
+      context.lastVisitedTarget = target;
+      context.lastVisitedProperty = property;
+
+      console.log("last prop", context.lastVisitedProperty);
       return Reflect.get(...arguments);
     },
     set(target, property, val) {
-      const { varReference } = context;
+      const { dependencyBucket } = context;
 
-      if (varReference.has(target) && varReference.get(target).has(property)) {
-        const callbackArr = varReference.get(target).get(property);
-        while (callbackArr.length) {
-          callbackArr.shift()();
-        }
-      } 
-  
-      if (typeof target[property] === 'object') {
+      clearAndRunAllDeps(dependencyBucket, target, property);
+
+      // only handle with object is not enough, may be array's handler is not in such an operation
+      if (typeof target[property] === "object") {
         const proxied = proxify(val, handler);
         return Reflect.set(target, property, proxied);
       }
 
       return Reflect.set(...arguments);
-    }
-  }
+    },
+  };
 
   return handler;
-}
+};
 
 export function connect(context, selector, callback) {
   const value = selector(context.proxiedObj);
-  const {
-    varReference,
-    lastTarget,
-    lastProperty
-  } = context;
+  console.log(11121);
+  // side effect: lastVisitedTarget and lastVisitedProperty are changed on the run of selector.
+  const { dependencyBucket, lastVisitedTarget, lastVisitedProperty } = context;
 
-  if (!varReference.has(lastTarget)) {
-    varReference.set(context.lastTarget, new Map());
-  }
-
-  if (!varReference.get(lastTarget).has(lastProperty)) {
-    varReference.get(lastTarget).set(lastProperty, []);
-  }
-  
-  varReference.get(lastTarget).get(lastProperty).push(() => {
-    callback();
-  });
+  addDep(dependencyBucket, lastVisitedTarget, lastVisitedProperty, callback);
 
   return {
     value,
     disConnect: () => {
-      const toDeleteIndex = varReference.get(lastTarget).get(lastProperty).indexOf(callback);
-      varReference.get(lastTarget).get(lastProperty).splice(toDeleteIndex, 1);
-    }
+      const toDeleteIndex = dependencyBucket
+        .get(lastVisitedTarget)
+        .get(lastVisitedProperty)
+        .indexOf(callback);
+      dependencyBucket
+        .get(lastVisitedTarget)
+        .get(lastVisitedProperty)
+        .splice(toDeleteIndex, 1);
+    },
   };
 }
 
 export function createContext(dataSource) {
   const context = {
-    lastTarget: null,
-    lastProperty: null,
-    varReference: new Map(),
-    proxiedObj: null
+    lastVisitedTarget: null,
+    lastVisitedProperty: null,
+    dependencyBucket: new Map(), // Map<Object, Map<string | symbol, () => void[]>>
+    proxiedObj: null,
   };
 
   const handler = createHandler(context);
@@ -95,16 +124,4 @@ export function createContext(dataSource) {
   context.proxiedObj = proxiedObj;
 
   return context;
-}
-
-export function combineAllReducers(...reducers) {
-  return chunkData => {
-    for (let i = 0; i < reducers.length; i++) {
-      const reducerAction = reducers[i](chunkData)
-      if (reducerAction) {
-        return reducerAction;
-      }
-    }
-    return null;
-  }
 }

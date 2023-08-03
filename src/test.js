@@ -1,14 +1,29 @@
-import { createContext, connect } from './index.js';
+import { createContext, connect } from "./index.js";
 
 const dataSource = {
-    name: 'chengruixin.ray',
-    age: 23
-}
+  name: "hello there",
+  age: 55,
+};
 const context = createContext(dataSource);
 
-const { value, disConnect } = connect(context, state => state.name, () => {
-    console.log('name is changed');
-});
+const { value: name, disConnect: disName } = connect(
+  context,
+  (state) => state.name,
+  () => {
+    console.log("name is changed");
+  }
+);
 
-console.log(value);
-context.proxiedObj.name = "abc";
+const { value: age, disConnect: diaAge } = connect(
+    context,
+    (state) => state.age,
+    () => {
+      console.log("age is changed");
+    }
+  );
+
+console.log(name);
+context.proxiedObj.name = "abc1";
+
+console.log(age);
+context.proxiedObj.age = 10;
