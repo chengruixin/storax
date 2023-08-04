@@ -65,33 +65,43 @@ const createHandler = (context) => {
     },
     set(target, property, val) {
       const { dependencyBucket } = context;
-
-      clearAndRunAllDeps(dependencyBucket, target, property);
-
-      // only handle with object is not enough, may be array's handler is not in such an operation
-      if (typeof target[property] === "object") {
-        const proxied = proxify(val, handler);
-        return Reflect.set(target, property, proxied);
-      }
-
-      return Reflect.set(...arguments);
+      return reflectedSetter(dependencyBucket, target, property, handler, val);
     },
   };
 
   return handler;
 };
 
+const reflectedSetter = (depBucket, target, property, handler, val) => {
+  clearAndRunAllDeps(depBucket, target, property);
+
+  if (typeof target[property] === "object") {
+    return Reflect.set(target, property, proxify(val, handler));
+  } else {
+    return Reflect.set(target, property, val);
+  }
+};
+
 export function connect(context, selector, callback) {
   const value = selector(context.proxiedObj);
   // side effect: lastVisitedTarget and lastVisitedProperty are changed on the run of selector.
-  const { dependencyBucket, lastVisitedTarget, lastVisitedProperty } = context;
+  const { dependencyBucket, lastVisitedTarget, lastVisitedProperty, handler } =
+    context;
+
+  const setValue = (val) => {
+    reflectedSetter(dependencyBucket, lastVisitedTarget, lastVisitedProperty, handler, val);
+  };
 
   addDep(dependencyBucket, lastVisitedTarget, lastVisitedProperty, callback);
 
   return {
     value,
+    setValue,
     disConnect: () => {
-      dependencyBucket.get(lastVisitedTarget).get(lastVisitedProperty).delete(callback);
+      dependencyBucket
+        .get(lastVisitedTarget)
+        .get(lastVisitedProperty)
+        .delete(callback);
     },
   };
 }
@@ -102,12 +112,14 @@ export function createContext(dataSource) {
     lastVisitedProperty: null,
     dependencyBucket: new Map(), // Map<Object, Map<string | symbol, () => void[]>>
     proxiedObj: null,
+    handler: null,
   };
 
   const handler = createHandler(context);
   const proxiedObj = proxify(dataSource, handler);
 
   context.proxiedObj = proxiedObj;
+  context.handler = handler;
 
   return context;
 }

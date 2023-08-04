@@ -7,7 +7,7 @@ import external from 'rollup-plugin-peer-deps-external';
 const packageJson = require("./package.json");
 
 export default {
-    input: 'src/index_react.js',
+    input: 'src/storax.js',
     output: [
         {
             file: packageJson.main,
