@@ -26,8 +26,6 @@ export function createStore(dataSource, reducer) {
 }
 
 export function createRax(dataSource) {
-  console.log('using sto11rax');
-
   const context = createContext(dataSource);
 
   function useRax(selector) {
