@@ -12,9 +12,7 @@ export function createStore(dataSource, reducer) {
 
   function useConnector(selector) {
     const [, forceUpdate] = useState({});
-    const { value, disConnect } = connect(context, selector, () => {
-      forceUpdate({});
-    });
+    const { value, disConnect } = connect(context, selector, forceUpdate);
     useEffect(() => disConnect, []);
     return value;
   }

@@ -3,12 +3,12 @@ const clearAndRunAllDeps = (dependencyBucket, target, property) => {
     dependencyBucket.has(target) &&
     dependencyBucket.get(target).has(property)
   ) {
-    const callbackArr = dependencyBucket.get(target).get(property);
-
-    // release all dependenies and execute
-    while (callbackArr.length) {
-      callbackArr.shift()();
+    const callbackSet = dependencyBucket.get(target).get(property);
+    const callbackArr = Array.from(callbackSet);
+    for (const callback of callbackArr) {
+      callback({});
     }
+    callbackSet.clear();
   }
 };
 
@@ -20,16 +20,11 @@ const addDep = (dependencyBucket, target, property, dep) => {
 
   // prepare for non property on target
   if (!dependencyBucket.get(target).has(property)) {
-    dependencyBucket.get(target).set(property, []);
+    dependencyBucket.get(target).set(property, new Set());
   }
 
   // real add dep operation
-  dependencyBucket
-    .get(target)
-    .get(property)
-    .push(() => {
-      dep();
-    });
+  dependencyBucket.get(target).get(property).add(dep);
 };
 
 function proxify(obj, handler) {
@@ -66,7 +61,6 @@ const createHandler = (context) => {
       context.lastVisitedTarget = target;
       context.lastVisitedProperty = property;
 
-      console.log("last prop", context.lastVisitedProperty);
       return Reflect.get(...arguments);
     },
     set(target, property, val) {
@@ -89,7 +83,6 @@ const createHandler = (context) => {
 
 export function connect(context, selector, callback) {
   const value = selector(context.proxiedObj);
-  console.log(11121);
   // side effect: lastVisitedTarget and lastVisitedProperty are changed on the run of selector.
   const { dependencyBucket, lastVisitedTarget, lastVisitedProperty } = context;
 
@@ -98,14 +91,7 @@ export function connect(context, selector, callback) {
   return {
     value,
     disConnect: () => {
-      const toDeleteIndex = dependencyBucket
-        .get(lastVisitedTarget)
-        .get(lastVisitedProperty)
-        .indexOf(callback);
-      dependencyBucket
-        .get(lastVisitedTarget)
-        .get(lastVisitedProperty)
-        .splice(toDeleteIndex, 1);
+      dependencyBucket.get(lastVisitedTarget).get(lastVisitedProperty).delete(callback);
     },
   };
 }
